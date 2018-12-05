@@ -1,0 +1,39 @@
+- name: get internal host IP
+  shell: >
+        ifconfig |egrep -A1 '(docker0|10\.201)'|egrep '(172\.|10\.201)'|ifconfig |egrep -A1 '(docker0|10\.201)'|egrep -o '(172\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+|10\.201.[[:digit:]]+\.[[:digit:]]+)'|grep -v '\.255$'|tail -n1
+  register: internal_ip
+  changed_when: False
+  tags:
+    - service
+
+- name: Start service
+  docker_container:
+    name: "service_{{item}}"
+    state: started
+    image: "{{service_image}}:{{service_image_tag}}"
+    ports:
+      - "{{internal_ip.stdout}}::6060"
+      - "{{internal_ip.stdout}}::80"
+    env:
+      SERVICE_80_NAME: "service"
+      SERVICE_80_TAGS: "balance"
+      SERVICE_6060_NAME: "service-mgmnt"
+      SV_HTTP_LISTEN: "0.0.0.0:80"
+      SV_DEBUG_LISTEN: "0.0.0.0:6060"
+      SV_VERBOSE: "{{service_log_level}}"
+      SV_TT_LISTEN: "{{service_tt_url}}"
+      SV_TT_USER: "{{service_tt_user}}"
+      SV_TT_PASS: "{{service_tt_pass}}"
+      SV_BASE_URL: "{{service_base_url}}"
+    restart_policy: on-failure
+    dns_servers:
+      - "{{internal_ip.stdout}}"
+    timeout: 900
+    log_driver: syslog
+    log_options:
+      tag: "docker/service_{{item}}"
+    networks:
+      - name: dev
+  loop: "{{ range(0, service_count_per_node )|list }}"
+  tags:
+    - service

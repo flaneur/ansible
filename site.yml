@@ -1,0 +1,18 @@
+---
+- hosts: shared-reports
+  gather_facts: true
+  serial: 1
+  become: true
+  pre_tasks:
+    - raw: yum install -y python27-simplejson
+      changed_when: false
+      when: ansible_distribution == 'Amazon'
+    - raw: yum install -y epel-release
+      changed_when: false
+      when: ansible_distribution == 'CentOS'
+    - raw: yum install -y python2-simplejson
+      changed_when: false
+      when: ansible_distribution == 'CentOS'
+  roles:
+    - infra
+    - service
